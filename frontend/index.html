@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Volunteer Hour Log | AYLUS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+  <div class="background-blobs">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <main class="app-container">
+    <header>
+      <div class="logo-area">
+        <i data-lucide="activity" class="logo-icon"></i>
+        <h1>Volunteer <span>Auto Logger</span></h1>
+      </div>
+      <p class="subtitle">A small tool to make my fellow AYLUS members' lives easier</p>
+    </header>
+
+    <section class="control-panel glass">
+      <div class="input-group">
+        <label for="url-input">Target Webpage</label>
+        <div class="url-input-wrapper">
+          <i data-lucide="link" class="input-icon"></i>
+          <input type="url" id="url-input" value="https://aylus.org/2024/10/12/lake-washington-wa/" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="date-filters">
+        <div class="input-group">
+          <label for="start-date">Start Date</label>
+          <input type="date" id="start-date">
+        </div>
+        <div class="input-group">
+          <label for="end-date">End Date</label>
+          <input type="date" id="end-date">
+        </div>
+      </div>
+
+      <button id="scrape-btn" class="primary-btn">
+        <span class="btn-text">Start Extraction</span>
+        <i data-lucide="zap" class="btn-icon"></i>
+        <div class="loader"></div>
+      </button>
+    </section>
+
+    <div id="status-container" class="hidden">
+      <div class="progress-info">
+        <span id="status-text">Ready to work...</span>
+      </div>
+    </div>
+
+    <section id="results-area" class="hidden">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="summary">Summary</button>
+        <button class="tab-btn" data-tab="details">All Activity</button>
+      </div>
+
+      <div class="tab-content glass" id="summary-tab">
+        <div class="table-header">
+          <h2>Summary by Volunteer</h2>
+          <button id="export-btn" class="icon-btn" title="Download CSV">
+            <i data-lucide="download"></i>
+          </button>
+        </div>
+        <div class="table-wrapper">
+          <table id="summary-table">
+            <thead>
+              <tr>
+                <th>Volunteer Name</th>
+                <th>Total Hours</th>
+                <th>Activity Count</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-content glass hidden" id="details-tab">
+        <div class="table-header">
+          <h2>All Activity Records</h2>
+        </div>
+        <div class="table-wrapper">
+          <table id="details-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Name</th>
+                <th>Hours</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/dist/date-fns.min.js"></script>
+  <script type="module" src="main.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "aylus-volunteer-sync",
+  "version": "1.0.0",
+  "description": "Volunteer hour scraper for AYLUS branches",
+  "main": "index.js",
+  "scripts": {
+    "postinstall": "npx playwright install chromium || true",
+    "start": "node index.js",
+    "build": "echo Frontend is pre-built into dist/ before deployment",
+    "build:local": "cd ../frontend && npm run build",
+    "deploy": "npm run build:local && node -e \"const fs=require('fs'),archiver=require('archiver'),out=fs.createWriteStream('../deploy.zip'),a=archiver('zip');out.on('close',()=>console.log('deploy.zip created: '+a.pointer()+' bytes'));a.pipe(out);a.glob('**/*',{cwd:'.',ignore:['node_modules/**','test-playwright.js']});a.finalize()\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cheerio": "1.0.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "playwright": "^1.58.2",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1"
+  }
+}
