@@ -2,7 +2,7 @@
 
 A modern, user-friendly web application for tracking volunteer hours, managing events, and generating reports.
 
-I lead a branch of AYLUS, a nationwide student‑run nonprofit with more than 180 branches. One of my responsibilities is compiling each member’s monthly and yearly volunteer hours—a process that is accurate but extremely time‑consuming. To make this easier, I built a small tool called Volunteer Auto Logger.
+I lead a branch of AYLUS, a nationwide student‑run nonprofit with more than 180 branches. One of my responsibilities is compiling each member’s monthly and yearly volunteer hours—a process that is accurate but extremely time‑consuming. To make this easier, I built a small tool called Volunteer Auto Logger, which can run locally and automatically compile members' volunteer hours from their reports for a selected period of time.
 
 All AYLUS branches are welcome to download the tool and use it on their local devices. I hope it helps save your time and energy as well.
 
