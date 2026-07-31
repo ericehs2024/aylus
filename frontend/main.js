@@ -20,6 +20,12 @@ const elements = {
   tabContents: document.querySelectorAll('.tab-content')
 };
 
+// Load saved URL from localStorage
+const savedUrl = localStorage.getItem('aylus_branch_url');
+if (savedUrl) {
+  elements.urlInput.value = savedUrl;
+}
+
 // Set default dates (past month)
 const today = new Date();
 const lastMonth = new Date(today);
@@ -30,15 +36,28 @@ elements.startDate.valueAsDate = lastMonth;
 
 /* --- API Interaction --- */
 
+function isServerBusy(error) {
+  const msg = error.message || '';
+  return msg.includes('Server busy') ||
+    msg.includes('Rate limit') ||
+    msg.includes('rate limit') ||
+    msg.includes('too many') ||
+    msg.includes('429') ||
+    msg.includes('503') ||
+    msg.includes('Gemini API') ||
+    msg.includes('Gemini error') ||
+    msg.includes('Scraping error');
+}
+
 async function startScrape() {
   const url = elements.urlInput.value.trim();
   if (!url) {
-    showStatus('Please enter a valid URL', 'error');
+    showStatus('Please enter your branch homepage URL', 'error');
     return;
   }
 
   setLoadingStatus(true);
-  showStatus('Searching activity links and parsing hours...', 'info');
+  showStatus('It may take a few minutes. Please wait...', 'info');
 
   try {
     const response = await axios.post('/api/scrape', {
@@ -56,12 +75,21 @@ async function startScrape() {
       throw new Error(response.data.error || 'Unknown error occurred');
     }
   } catch (error) {
-    showStatus(`Error: ${error.message}`, 'error');
+    if (isServerBusy(error)) {
+      showStatus('Server busy, please wait a few minutes', 'error');
+    } else {
+      showStatus(`Error: ${error.message}`, 'error');
+    }
     console.error(error);
   } finally {
     setLoadingStatus(false);
   }
 }
+
+// Save URL to localStorage on blur (when input loses focus)
+elements.urlInput.addEventListener('blur', () => {
+  localStorage.setItem('aylus_branch_url', elements.urlInput.value.trim());
+});
 
 /* --- Data Processing --- */
 

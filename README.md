@@ -27,7 +27,6 @@ All AYLUS branches are welcome to download the tool and use it on their local de
 ### Prerequisites
 
 - Node.js (v14 or higher)
-- MongoDB
 
 ### Installation
 
@@ -46,8 +45,6 @@ All AYLUS branches are welcome to download the tool and use it on their local de
    Create a `.env` file in the root directory with the following variables:
    ```env
    PORT=5000
-   MONGO_URI=your_mongodb_connection_string
-   JWT_SECRET=your_jwt_secret
    ```
 
 4. Start the development server:

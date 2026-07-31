@@ -3,8 +3,8 @@ import path from 'path';
 
 export default defineConfig({
   build: {
-    // Output directly into the backend's dist folder
-    outDir: path.resolve(__dirname, '../backend/dist'),
+    // Output to frontend/dist/ first, then build.js copies to backend/dist/
+    outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
   },
   server: {

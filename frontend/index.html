@@ -27,15 +27,15 @@
         <i data-lucide="activity" class="logo-icon"></i>
         <h1>Volunteer <span>Auto Logger</span></h1>
       </div>
-      <p class="subtitle">A small tool to make my fellow AYLUS members' lives easier</p>
+      <p class="subtitle">A small tool built to make life easier for fellow AYLUS members.</p>
     </header>
 
     <section class="control-panel glass">
       <div class="input-group">
-        <label for="url-input">Target Webpage</label>
+        <label for="url-input">Branch Homepage Url</label>
         <div class="url-input-wrapper">
           <i data-lucide="link" class="input-icon"></i>
-          <input type="url" id="url-input" value="https://aylus.org/2024/10/12/lake-washington-wa/" autocomplete="off">
+          <input type="url" id="url-input" required autocomplete="off">
         </div>
       </div>
 
@@ -112,7 +112,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/dist/date-fns.min.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 
