@@ -27,7 +27,8 @@
         <i data-lucide="activity" class="logo-icon"></i>
         <h1>Volunteer <span>Auto Logger</span></h1>
       </div>
-      <p class="subtitle">A small tool built to make life easier for fellow AYLUS members.</p>
+      <p class="credit">Developed by Eric Huang</p>
+      <p class="subtitle">A small tool built to make life easier for my fellow AYLUS members.</p>
     </header>
 
     <section class="control-panel glass">
@@ -51,7 +52,7 @@
       </div>
 
       <button id="scrape-btn" class="primary-btn">
-        <span class="btn-text">Start Extraction</span>
+        <span class="btn-text">Go</span>
         <i data-lucide="zap" class="btn-icon"></i>
         <div class="loader"></div>
       </button>
@@ -80,9 +81,9 @@
           <table id="summary-table">
             <thead>
               <tr>
-                <th>Volunteer Name</th>
-                <th>Total Hours</th>
-                <th>Activity Count</th>
+                <th data-sort="name">Volunteer Name <span class="sort-indicator"></span></th>
+                <th data-sort="total">Total Hours <span class="sort-indicator"></span></th>
+                <th data-sort="count">Activity Count <span class="sort-indicator"></span></th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -98,9 +99,9 @@
           <table id="details-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Name</th>
-                <th>Hours</th>
+                <th data-sort="date">Date <span class="sort-indicator"></span></th>
+                <th data-sort="name">Name <span class="sort-indicator"></span></th>
+                <th data-sort="hours">Hours <span class="sort-indicator"></span></th>
                 <th>Source</th>
               </tr>
             </thead>

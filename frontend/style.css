@@ -29,7 +29,7 @@ body {
   overflow-x: hidden;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   padding: 2rem;
 }
 
@@ -134,11 +134,21 @@ h1 span {
   -webkit-text-fill-color: transparent;
 }
 
+.credit {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0 auto;
+}
+
 .subtitle {
   color: var(--text-secondary);
-  font-size: 1.1rem;
+  font-size: 0.95rem;
+  font-style: italic;
   max-width: 500px;
-  margin: 0 auto;
+  margin: 0.25rem auto 0;
 }
 
 /* Card Sections */
@@ -331,6 +341,28 @@ th {
   letter-spacing: 0.05em;
   border-bottom: 2px solid var(--border-color);
   background: #f8fafc;
+}
+
+th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+th[data-sort]:hover {
+  color: var(--text-primary);
+}
+
+.sort-indicator {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.75em;
+  opacity: 0.35;
+}
+
+.sort-indicator.active {
+  opacity: 1;
+  color: var(--accent, #0d9488);
 }
 
 td {
