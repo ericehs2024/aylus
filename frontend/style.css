@@ -169,8 +169,8 @@ h1 span {
 /* Form Controls */
 .control-panel {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 2rem;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
   align-items: flex-end;
 }
 
@@ -231,7 +231,6 @@ input:focus {
 }
 
 .primary-btn {
-  grid-column: span 2;
   background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
   border: none;
   border-radius: 14px;
