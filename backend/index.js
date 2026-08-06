@@ -357,9 +357,9 @@ async function throttleGemini(promptTokens = 0) {
  */
 async function geminiCallWithRetry(prompt, pageUrl = '') {
   const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+  const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
   const maxRetries = 3;
-  const GEMINI_TIMEOUT_MS = 60 * 1000;
+  const GEMINI_TIMEOUT_MS = 30 * 60 * 1000;
   const GEMINI_PROMPT_MAX_CHARS = 750000;
 
   if (prompt.length > GEMINI_PROMPT_MAX_CHARS) {
@@ -416,7 +416,7 @@ async function geminiCallWithRetry(prompt, pageUrl = '') {
       return candidate?.text || '';
     } catch (error) {
       if (error.name === 'AbortError') {
-        throw new Error(`Gemini request timed out after ${GEMINI_TIMEOUT_MS / 1000}s`);
+        throw new Error(`Gemini request timed out after ${GEMINI_TIMEOUT_MS / 1000}s; the date range may be too large, please narrow it and retry`);
       }
       console.error(`[gemini] Call failed (attempt ${attempt + 1}): ${error.message}`);
       if (attempt < maxRetries - 1) {
@@ -437,10 +437,30 @@ async function geminiCallWithRetry(prompt, pageUrl = '') {
 // names and hours usually appear)
 const GEMINI_PER_ACTIVITY_CAP = 2000;
 
-function buildVolunteerPrompt(activityTexts) {
-  let promptText = `Extract volunteer names and hours from ALL activity reports below.
+function buildVolunteerPrompt(activityTexts, startDate = null, endDate = null, aliases = []) {
+  let rangeLine = 'No date range filter applied.';
+  if (startDate && endDate) {
+    rangeLine = `Include only activities whose date falls between ${startDate} and ${endDate} (inclusive on both ends).`;
+  } else if (startDate) {
+    rangeLine = `Include only activities dated ${startDate} or later.`;
+  } else if (endDate) {
+    rangeLine = `Include only activities dated ${endDate} or earlier.`;
+  }
+
+  let aliasLine = '';
+  const validAliases = Array.isArray(aliases)
+    ? aliases.filter(a => a && String(a.name || '').trim() && String(a.aliases || '').trim())
+    : [];
+  if (validAliases.length > 0) {
+    aliasLine = '\nName alias rules (each list is the SAME person):\n' + validAliases
+      .map(a => `  - "${a.name.trim()}" == "${a.aliases.trim()}"`)
+      .join('\n') + '\nReport all hours for these people under the single primary name shown.';
+  }
+
+  let promptText = `Extract volunteer names and hours from the activity reports below.
+${rangeLine} Determine each activity's date from its URL and/or report text; ignore any activity that falls OUTSIDE the requested range. Perform ALL hour tracking here.${aliasLine}
 Return ONLY a JSON array in this exact format: [{"name": "Full Name", "hours": 2.5, "date": "YYYY-MM-DD", "sourceUrl": "https://..."}].
-If no volunteers are mentioned, return an empty array [].
+If no volunteers are mentioned (or none fall within the range), return an empty array [].
 
 Here are the activity reports (numbered for reference):
 `;
@@ -455,14 +475,14 @@ Here are the activity reports (numbered for reference):
 /**
  * Extract volunteer hours via Gemini in a single call.
  */
-async function extractVolunteersBatched(activityTexts) {
+async function extractVolunteersBatched(activityTexts, startDate = null, endDate = null, aliases = []) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY not set, cannot extract volunteers');
   }
 
-  console.log(`[gemini-vol] Sending ${activityTexts.length} activities in a single Gemini call`);
-  const promptText = buildVolunteerPrompt(activityTexts);
+  console.log(`[gemini-vol] Sending ${activityTexts.length} activities in a single Gemini call (range: ${startDate} → ${endDate}, aliases: ${aliases.length})`);
+  const promptText = buildVolunteerPrompt(activityTexts, startDate, endDate, aliases);
 
   try {
     const raw = await geminiCallWithRetry(promptText);
@@ -484,12 +504,15 @@ async function extractVolunteersBatched(activityTexts) {
     if (error.message.includes('Rate limit') || error.message.includes('429') || error.message.includes('503')) {
       throw new Error('Server busy, please wait a few minutes');
     }
+    if (error.message.includes('too large') || error.message.includes('timed out')) {
+      throw new Error('The requested date range is too large for one request. Please reduce the date range and try again.');
+    }
     throw error;
   }
 }
 
 app.post('/api/scrape', async (req, res) => {
-  const { url, startDate, endDate } = req.body;
+  const { url, startDate, endDate, aliases } = req.body;
 
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
@@ -500,11 +523,8 @@ app.post('/api/scrape', async (req, res) => {
   console.log(`[request] URL: ${url}`);
   console.log(`[request] startDate: ${startDate}`);
   console.log(`[request] endDate: ${endDate}`);
+  console.log(`[request] aliases: ${JSON.stringify(aliases)}`);
   console.log(`[request] Started at: ${new Date().toISOString()}`);
-
-  // Parse optional date range bounds (inclusive on both ends)
-  const rangeStart = startDate ? new Date(startDate) : null;
-  const rangeEnd = endDate ? new Date(endDate) : null;
   console.log(`[date-filter] Requested range: ${startDate} → ${endDate}`);
 
   try {
@@ -517,8 +537,8 @@ app.post('/api/scrape', async (req, res) => {
     const allLinks = extractAllLinks($);
     console.log(`[timing] Main page fetched: ${Date.now() - startTime}ms`);
 
-    // Step 2: Extract activity links + dates with regex only (no LLM).
-    // Covers multiple date formats (numeric and month names, 2/4-digit years).
+    // Step 2: Extract ALL activity links via regex (no LLM, no date filter).
+    // Date-range filtering is deferred to Gemini so no links are missed.
     let rawLinks = extractActivitiesByRegex(allLinks, url);
 
     // Last fallback: regex found nothing → Cheerio ul walk
@@ -527,53 +547,22 @@ app.post('/api/scrape', async (req, res) => {
       const fallbackLinks = extractActivitiesFallback($);
       rawLinks = fallbackLinks.map(link => ({
         url: link.url.startsWith('http') ? link.url : new URL(link.url, url).href,
-        date: null, // unknown — included regardless of date range
+        date: null, // unknown — Gemini decides from the page text
         text: link.text
       }));
     }
 
-    // Step 3: Filter by date range
-    let activitiesLinks = [];
-    for (const link of rawLinks) {
-      // Fallback links have no date — include them regardless of the range
-      if (!link.date) {
-        console.log(`[date-filter] No date (fallback link), INCLUDING: ${link.url}`);
-        activitiesLinks.push({ url: link.url, date: null, text: link.text || 'activity' });
-        continue;
-      }
-
-      let dateStr = link.date;
-      let parsed = new Date(dateStr);
-
-      if (isNaN(parsed.getTime())) {
-        console.log(`[date-filter] Invalid date "${dateStr}", skipping`);
-        continue;
-      }
-
-      const inRange = (!rangeStart || parsed >= rangeStart) && (!rangeEnd || parsed <= rangeEnd);
-      console.log(`[date-filter] ${inRange ? 'IN RANGE' : 'OUT OF RANGE'}: ${link.url} (${dateStr})`);
-
-      if (inRange) {
-        activitiesLinks.push({
-          url: link.url,
-          date: link.date,
-          text: link.text || `${link.date} activity`
-        });
-      }
-    }
-    console.log(`[date-filter] Total links in date range: ${activitiesLinks.length}`);
-
-    if (activitiesLinks.length === 0) {
-      console.log('[scrape] No activities in date range, returning empty');
+    if (rawLinks.length === 0) {
+      console.log('[scrape] No activity links found, returning empty');
       return res.json({ success: true, data: [] });
     }
 
-    // Step 4: Fetch activity pages with a concurrency pool (limit 6)
+    // Step 3: Fetch activity pages with a concurrency pool (limit 6)
     // to avoid triggering WAF/rate limits while staying much faster than sequential.
-    console.log(`[scrape] === Fetching ${activitiesLinks.length} activity pages (6 concurrent) ===`);
-    let activityTexts = [];
+    // ALL links are fetched; Gemini filters them by date range in the single call below.
+    console.log(`[scrape] === Fetching ${rawLinks.length} activity pages (6 concurrent) ===`);
 
-    const pageResults = await mapLimit(activitiesLinks, 6, async (link) => {
+    const pageResults = await mapLimit(rawLinks, 6, async (link) => {
       const detailHtml = await fetchHtml(link.url);
       if (!detailHtml) return null;
       const text = extractContentText(detailHtml);
@@ -581,14 +570,15 @@ app.post('/api/scrape', async (req, res) => {
       return { url: link.url, date: link.date, text };
     });
 
-    activityTexts = pageResults.filter(r => r && r.text.trim());
+    const activityTexts = pageResults.filter(r => r && r.text.trim());
 
     console.log(`[timing] All pages fetched: ${Date.now() - startTime}ms`);
-    console.log(`[scrape] === All pages fetched, sending to Gemini ===`);
+    console.log(`[scrape] === All pages fetched, sending to Gemini (range-filter + hours) ===`);
 
-    // Step 5: ONE Gemini call to extract volunteers from ALL activities
+    // Step 4: ONE Gemini call that filters the links by the requested date
+    // range and performs ALL the hour tracking for the in-range activities.
     console.log(`[timing] Before volunteer extraction: ${Date.now() - startTime}ms`);
-    const allVolunteers = await extractVolunteersBatched(activityTexts);
+    const allVolunteers = await extractVolunteersBatched(activityTexts, startDate, endDate, aliases);
 
     console.log(`[timing] Volunteer extraction done: ${Date.now() - startTime}ms`);
     console.log(`[scrape] === Complete ===`);

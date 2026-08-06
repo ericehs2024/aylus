@@ -3,6 +3,8 @@ let rawData = [];
 let filteredData = [];
 let summaryData = [];
 
+const MAX_RANGE_DAYS = 365;
+
 // Per-table sort state: { col, dir } with dir = 1 (asc) or -1 (desc)
 const sortState = {
   summary: { col: 'total', dir: -1 },
@@ -70,7 +72,9 @@ const elements = {
   summaryTableBody: document.querySelector('#summary-table tbody'),
   detailsTableBody: document.querySelector('#details-table tbody'),
   tabBtns: document.querySelectorAll('.tab-btn'),
-  tabContents: document.querySelectorAll('.tab-content')
+  tabContents: document.querySelectorAll('.tab-content'),
+  aliasList: document.getElementById('alias-list'),
+  addAliasBtn: document.getElementById('add-alias-btn')
 };
 
 // Load saved URL from localStorage
@@ -79,6 +83,124 @@ if (savedUrl) {
   elements.urlInput.value = savedUrl;
 }
 
+/* --- Name Aliases --- */
+
+const ALIAS_STORAGE_KEY = 'aylus_name_aliases';
+const ALIAS_EXPIRY_MS = 3 * 365 * 24 * 60 * 60 * 1000; // 3 years
+
+let aliasEntries = [];
+
+function loadAliases() {
+  try {
+    const raw = localStorage.getItem(ALIAS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.entries)) return [];
+    if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+      localStorage.removeItem(ALIAS_STORAGE_KEY);
+      return [];
+    }
+    return parsed.entries.filter(e => e && typeof e.name === 'string');
+  } catch {
+    return [];
+  }
+}
+
+function saveAliases() {
+  localStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify({
+    expiresAt: Date.now() + ALIAS_EXPIRY_MS,
+    entries: aliasEntries
+  }));
+}
+
+function renderAliasRows() {
+  elements.aliasList.innerHTML = '';
+
+  if (aliasEntries.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'alias-empty';
+    empty.textContent = 'No aliases yet. Add one to merge duplicate names in the summary.';
+    elements.aliasList.appendChild(empty);
+    return;
+  }
+
+  aliasEntries.forEach((entry, idx) => {
+    const row = document.createElement('div');
+    row.className = 'alias-row';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'alias-name';
+    nameInput.placeholder = 'Primary Name';
+    nameInput.value = entry.name || '';
+
+    const eq = document.createElement('span');
+    eq.className = 'alias-eq';
+    eq.textContent = '==';
+
+    const aliasInput = document.createElement('input');
+    aliasInput.type = 'text';
+    aliasInput.className = 'alias-inputs';
+    aliasInput.placeholder = 'Alias1, Alias2';
+    aliasInput.value = entry.aliases || '';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'alias-remove-btn';
+    removeBtn.title = 'Remove alias';
+    removeBtn.setAttribute('aria-label', 'Remove alias');
+    removeBtn.textContent = '×';
+
+    const update = () => {
+      entry.name = nameInput.value;
+      entry.aliases = aliasInput.value;
+      saveAliases();
+      processAndDisplayData();
+    };
+    nameInput.addEventListener('input', update);
+    aliasInput.addEventListener('input', update);
+
+    removeBtn.addEventListener('click', () => {
+      aliasEntries.splice(idx, 1);
+      saveAliases();
+      renderAliasRows();
+      processAndDisplayData();
+    });
+
+    row.append(nameInput, eq, aliasInput, removeBtn);
+    elements.aliasList.appendChild(row);
+  });
+}
+
+function addAliasRow() {
+  aliasEntries.push({ name: '', aliases: '' });
+  saveAliases();
+  renderAliasRows();
+  const lastRow = elements.aliasList.lastElementChild;
+  const input = lastRow?.querySelector('.alias-name');
+  if (input) input.focus();
+}
+
+function canonicalName(name) {
+  if (!name) return name;
+  const normalized = String(name).replace(/\s+/g, ' ').trim().toLowerCase();
+  for (const entry of aliasEntries) {
+    const primary = (entry.name || '').replace(/\s+/g, ' ').trim();
+    if (!primary) continue;
+    if (primary.toLowerCase() === normalized) return primary;
+    const aliases = String(entry.aliases || '')
+      .split(',')
+      .map(a => a.replace(/\s+/g, ' ').trim().toLowerCase())
+      .filter(Boolean);
+    if (aliases.includes(normalized)) return primary;
+  }
+  return String(name).replace(/\s+/g, ' ').trim();
+}
+
+aliasEntries = loadAliases();
+renderAliasRows();
+elements.addAliasBtn.addEventListener('click', addAliasRow);
+
 // Set default dates (past month)
 const today = new Date();
 const lastMonth = new Date(today);
@@ -86,14 +208,6 @@ lastMonth.setMonth(today.getMonth() - 1);
 
 elements.endDate.valueAsDate = today;
 elements.startDate.valueAsDate = lastMonth;
-
-// Enforce the max range in the native date pickers
-const minStartDate = new Date(today);
-minStartDate.setDate(today.getDate() - MAX_RANGE_DAYS);
-elements.startDate.min = toISODate(minStartDate);
-elements.endDate.min = toISODate(minStartDate);
-elements.startDate.max = toISODate(today);
-elements.endDate.max = toISODate(today);
 
 /* --- API Interaction --- */
 
@@ -114,27 +228,27 @@ function getErrorMessage(error) {
   return error.response?.data?.error || error.message || 'Unknown error occurred';
 }
 
-const MAX_RANGE_DAYS = 365;
-
-function toISODate(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 function dateRangeError() {
   const startVal = elements.startDate.value;
   const endVal = elements.endDate.value;
   if (!startVal || !endVal) return null;
-  const diffDays = (new Date(endVal) - new Date(startVal)) / (1000 * 60 * 60 * 24);
+  const start = new Date(startVal);
+  const end = new Date(endVal);
+  if (start > end) {
+    return 'Start date cannot be after the end date.';
+  }
+  const diffDays = (end - start) / (1000 * 60 * 60 * 24);
   if (diffDays > MAX_RANGE_DAYS) {
     return `Date range cannot exceed ${MAX_RANGE_DAYS} days. Please narrow your start and end dates.`;
   }
   return null;
 }
 
+let isScraping = false;
+
 async function startScrape() {
+  if (isScraping) return;
+
   const url = elements.urlInput.value.trim();
   if (!url) {
     showStatus('Please enter your branch homepage URL', 'error');
@@ -147,14 +261,20 @@ async function startScrape() {
     return;
   }
 
+  isScraping = true;
   setLoadingStatus(true);
   showStatus('It may take a few minutes. Please wait...', 'info');
 
   try {
+    const aliases = aliasEntries
+      .filter(e => String(e.name || '').trim() && String(e.aliases || '').trim())
+      .map(e => ({ name: e.name.trim(), aliases: e.aliases.trim() }));
+
     const response = await axios.post('/api/scrape', {
       url,
       startDate: elements.startDate.value || null,
       endDate: elements.endDate.value || null,
+      aliases,
     });
 
     if (response.data.success) {
@@ -174,6 +294,7 @@ async function startScrape() {
     console.error(error);
   } finally {
     setLoadingStatus(false);
+    isScraping = false;
   }
 }
 
@@ -188,16 +309,18 @@ function processAndDisplayData() {
   const start = elements.startDate.value ? new Date(elements.startDate.value) : null;
   const end = elements.endDate.value ? new Date(elements.endDate.value) : null;
 
-  // Filter by date range
-  filteredData = rawData.filter(item => {
-    const itemDate = new Date(item.date);
-    if (isNaN(itemDate.getTime())) return false;
+  // Filter by date range and merge alias names into their primary name
+  filteredData = rawData
+    .filter(item => {
+      const itemDate = new Date(item.date);
+      if (isNaN(itemDate.getTime())) return false;
 
-    if (start && itemDate < start) return false;
-    if (end && itemDate > end) return false;
+      if (start && itemDate < start) return false;
+      if (end && itemDate > end) return false;
 
-    return true;
-  });
+      return true;
+    })
+    .map(item => ({ ...item, name: canonicalName(item.name) }));
 
   // Aggregate for Summary Table
   const summary = {};
@@ -272,6 +395,7 @@ elements.scrapeBtn.addEventListener('click', startScrape);
 
 // Re-filter when dates change
 function handleDateChange() {
+  if (isScraping) return; // don't re-enable the Go button mid-request
   const rangeError = dateRangeError();
   if (rangeError) {
     showStatus(rangeError, 'error');
